@@ -1,0 +1,9 @@
+group: newuser
+user: newuser
+user_name: "New User"
+password: $6$rounds=100000$KVpx8KvCHTVpSWaO$6kffxoScpq5wUSDGgDtSDEGwA638uX8ssdokx7pf58ctUzzLmWL5568feDy1K3TDgnCKlub6uSCkKafXXNivf0
+use_starttls: true
+from_address: sender@from.com
+smtp_server: mail.from.com
+smtp_auth_user: sender
+auth_login: userid

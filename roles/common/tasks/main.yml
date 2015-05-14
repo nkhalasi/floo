@@ -1,0 +1,93 @@
+- include_vars: common_vars.yml
+
+- name: Create {{ group }} group
+  group: name={{ group }} state=present
+
+- name: Create {{ user }} user
+  user:
+    name={{ user }}
+    comment="{{ user_name }}"
+    group={{ group }}
+    createhome=yes
+    home=/home/{{ user }}
+    shell=/bin/bash
+    password={{password}}
+    state=present
+
+- name: ensure ssh directory exists for {{ user}}
+  file: dest=/home/{{ user }}/.ssh owner={{ user }} group={{ group }} state=directory
+
+- name: ensure authorized_keys exists
+  file: 
+    path=/home/{{ user }}/.ssh/authorized_keys
+    state=touch
+    owner={{ user }}
+    group={{ group }}
+
+- name: remove public key from authorized_keys
+  lineinfile:
+    dest=/home/{{ user }}/.ssh/authorized_keys
+    state=absent
+    line="{{ lookup('file', '~/.ssh/m4700_id_rsa.pub') }}"
+
+- name: ensure public key is in authorized_keys 
+  lineinfile:
+    dest=/home/{{ user }}/.ssh/authorized_keys
+    state=present
+    line="{{ lookup('file', '~/.ssh/m4700_id_rsa.pub') }}"
+    insertafter=EOF
+    create=yes
+    owner={{ user }}
+    group={{ group }}
+    mode=600
+    regexp=^WILL_NOT_MATCH
+
+- name: update ssh parameters
+  lineinfile:
+    dest=/etc/ssh/sshd_config
+    state=present
+    regexp=^{{ item.key }}
+    line="{{ item.key }} {{ item.value }}"
+    insertafter=EOF
+  with_items:
+    - { key: 'PermitRootLogin', value: 'no' }
+    - { key: 'LoginGraceTime', value: '20' }
+    - { key: 'X11Forwarding', value: 'no' }
+    - { key: 'ClientAliveInterval', value: '30' }
+    - { key: 'ClientAliveCountMax', value: '1000' }
+  notify:
+    - restart ssh
+
+- name: Set timezone to UTC
+  action: shell echo Etc/UTC > /etc/timezone
+
+- name: Set localtime to UTC
+  file: src=/usr/share/zoneinfo/Etc/UTC dest=/etc/localtime
+
+- name: Reconfigure tzdata
+  action: command dpkg-reconfigure -f noninteractive tzdata
+
+- name: Update APT keys
+  command: apt-key update
+
+- name: Update APT cache
+  apt: update_cache=yes
+
+- name: Upgrade APT cache
+  apt: upgrade=yes
+
+- name: Install additional packages
+  apt: name={{ item }} state=present
+  with_items:
+    - heirloom-mailx
+    - libpam-cracklib
+
+- name: Increase password strength
+  lineinfile:
+    dest=/etc/pam.d/common-password
+    state=present
+    line='password    requisite    pam_cracklib.so retry=3 minlen=8 difok=3 minclass=4'
+    regexp="password.*requisite.*pam_cracklib.so"
+
+- name: Write mailx template
+  template: src=os/etc/nail.rc dest=/etc/nail.rc

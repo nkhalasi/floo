@@ -1,0 +1,5 @@
+group_vars/_*
+.*.swp
+.vagrant
+pyenv/**
+
